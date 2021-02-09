@@ -545,11 +545,6 @@ void read_problem(const char *filename)
 	}
 }
 
-
-
-
-
-
 double* read_old_weights(const char *filename, int * num_weights) {
 	FILE *fp = fopen(filename,"r");
 	if(fp == NULL)
@@ -577,7 +572,7 @@ double* read_old_weights(const char *filename, int * num_weights) {
 		w[idx] = atof(line);
 		idx++;
     	}
-	printf("Warm start: read %d weights\n", idx);
+	printf("Warm start: read %zu weights\n", idx);
 
     if (line)
         free(line);
@@ -585,4 +580,3 @@ double* read_old_weights(const char *filename, int * num_weights) {
 
 	return w;
 } 
-
