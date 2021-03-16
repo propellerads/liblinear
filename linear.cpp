@@ -3330,33 +3330,6 @@ static void find_parameter_C(const problem *prob, parameter *param_tmp, double s
 	free(prev_w);
 }
 
-
-//
-// Remove zero weighed data as libsvm and some liblinear solvers require C > 0.
-//
-static void remove_zero_weight(problem *newprob, const problem *prob)
-{
-	int i;
-	int l = 0;
-	for(i=0;i<prob->l;i++)
-		if(prob->W[i] > 0) l++;
-	*newprob = *prob;
-	newprob->l = l;
-	newprob->x = Malloc(feature_node*,l);
-	newprob->y = Malloc(double,l);
-	newprob->W = Malloc(double,l);
-
-	int j = 0;
-	for(i=0;i<prob->l;i++)
-		if(prob->W[i] > 0)
-		{
-			newprob->x[j] = prob->x[i];
-			newprob->y[j] = prob->y[i];
-			newprob->W[j] = prob->W[i];
-			j++;
-		}
-}
-
 //
 // Interface functions
 //
