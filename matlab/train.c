@@ -64,7 +64,8 @@ void exit_with_help()
 	"	(for -s 0, 2, 5, 6, 11)\n"
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
-	"-C : find parameters (C for -s 0, 2 and C, p for -s 11)\n"
+	"-i initial_model (matlab variable name): use a previously trained model for incremental/decremental training (only for -s 0 and 2)\n"
+	"-C : find parameters (C for -s 0, 2 and C, p for -s 11, can't exist with -i option)\n"
 	"-q : quiet mode (no outputs)\n"
 	"col:\n"
 	"	if 'col' is setted, training_instance_matrix is parsed in column format, otherwise is in row format\n"
@@ -75,6 +76,7 @@ void exit_with_help()
 struct parameter param;		// set by parse_command_line
 struct problem prob;		// set by read_problem
 struct model *model_;
+struct model *init_model;
 struct feature_node *x_space;
 int flag_cross_validation;
 int flag_find_parameters;
@@ -82,6 +84,7 @@ int flag_C_specified;
 int flag_p_specified;
 int flag_solver_specified;
 int col_format_flag;
+int warm_start_flag;
 int nr_fold;
 double bias;
 
@@ -161,6 +164,9 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 	char *argv[CMD_LEN/2];
 	void (*print_func)(const char *) = print_string_matlab;	// default printing to matlab display
 
+	mxArray *model_mat; // for loading the initial model from matlab workspace.
+	const char *error_msg;
+	
 	// default values
 	param.solver_type = L2R_L2LOSS_SVC_DUAL;
 	param.C = 1;
@@ -174,6 +180,7 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 	param.regularize_bias = 1;
 	flag_cross_validation = 0;
 	col_format_flag = 0;
+	warm_start_flag = 0;
 	flag_C_specified = 0;
 	flag_p_specified = 0;
 	flag_solver_specified = 0;
@@ -251,6 +258,25 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 				print_func = &print_null;
 				i--;
 				break;
+			case 'i':
+				warm_start_flag = 1;
+				model_mat = mexGetVariable("base", argv[i]);
+				if(model_mat == NULL)
+				{
+					mexPrintf("Error: The variable is not currently in the workspace.");	
+					return 1;				
+				}
+				else
+				{
+					init_model = Malloc(struct model, 1);
+					error_msg = matlab_matrix_to_model(init_model, model_mat);
+					if(error_msg)
+					{
+						mexPrintf("Error: can't convert libsvm model to matrix structure: %s\n", error_msg);
+						return 1;
+					}
+				}
+				break;
 			case 'C':
 				flag_find_parameters = 1;
 				i--;
@@ -263,6 +289,17 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 				mexPrintf("unknown option\n");
 				return 1;
 		}
+	}
+
+	if(warm_start_flag == 1)
+	{
+		if(param.solver_type != L2R_LR && param.solver_type != L2R_L2LOSS_SVC)
+		{
+			mexPrintf("Error: -i is supported only for -s 0 and 2.\n");
+			return 1;
+		}
+		if(param.solver_type != init_model->param.solver_type)
+			mexPrintf("Warning: the solver type of initial model does not match your -s option.\n");
 	}
 
 	set_print_string_function(print_func);
@@ -479,6 +516,16 @@ void mexFunction( int nlhs, mxArray *plhs[],
 			fake_answer(nlhs, plhs);
 			return;
 		}
+		if( flag_find_parameters && warm_start_flag)
+		{
+			mexPrintf("ERROR: Option -C and -i can't both exist\n");
+			destroy_param(&param);
+			free(prob.y);
+			free(prob.x);
+			free(x_space);
+			fake_answer(nlhs, plhs);
+			return;
+		}
 
 		if (flag_find_parameters)
 		{
@@ -502,8 +549,15 @@ void mexFunction( int nlhs, mxArray *plhs[],
 		else
 		{
 			const char *error_msg;
-
-			model_ = train(&prob, &param);
+			if(warm_start_flag == 1)
+			{
+				if(prob.n != init_model->nr_feature)
+					mexPrintf("Warning: the number of features in the input file does not match that in the initial model.\n");
+				model_ = warm_start_train(&prob, &param, init_model);
+				free_and_destroy_model(&init_model);
+			}
+			else
+				model_ = train(&prob, &param);
 			error_msg = model_to_matlab_structure(plhs, model_);
 			if(error_msg)
 				mexPrintf("Error: can't convert libsvm model to matrix structure: %s\n", error_msg);

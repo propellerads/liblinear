@@ -898,7 +898,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-static int solve_l2r_l1l2_svc(const problem *prob, const parameter *param, double *w, double Cp, double Cn, int max_iter=500)
+static int solve_l2r_l1l2_svc(const problem *prob, const parameter *param, double *w, double Cp, double Cn, int max_iter=300)
 {
 	int l = prob->l;
 	int w_size = prob->n;
@@ -1103,7 +1103,7 @@ static int solve_l2r_l1l2_svc(const problem *prob, const parameter *param, doubl
 #define GETI(i) (0)
 // To support weights for instances, use GETI(i) (i)
 
-static int solve_l2r_l1l2_svr(const problem *prob, const parameter *param, double *w, int max_iter=500)
+static int solve_l2r_l1l2_svr(const problem *prob, const parameter *param, double *w, int max_iter=300)
 {
 	const int solver_type = param->solver_type;
 	int l = prob->l;
@@ -1311,7 +1311,7 @@ static int solve_l2r_l1l2_svr(const problem *prob, const parameter *param, doubl
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-static int solve_l2r_lr_dual(const problem *prob, const parameter *param, double *w, double Cp, double Cn, int max_iter=500)
+static int solve_l2r_lr_dual(const problem *prob, const parameter *param, double *w, double Cp, double Cn, int max_iter=300)
 {
 	int l = prob->l;
 	int w_size = prob->n;
@@ -2777,6 +2777,23 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 	delete[] C;
 }
 
+struct label_index
+{
+	int label;
+	int index;
+};
+int label_compare(const void *a, const void *b)
+{
+	int a_label = ((struct label_index*)a)->label;
+	int b_label = ((struct label_index*)b)->label;
+	if(a_label > b_label)
+		return 1;
+	else if(a_label == b_label)
+		return 0;
+	else
+		return -1;
+}
+
 // Calculate the initial C for parameter selection
 static double calc_start_C(const problem *prob, const parameter *param)
 {
@@ -2959,6 +2976,11 @@ static void find_parameter_C(const problem *prob, parameter *param_tmp, double s
 //
 model* train(const problem *prob, const parameter *param)
 {
+	return warm_start_train(prob, param, NULL);
+}
+
+model* warm_start_train(const problem *prob, const parameter *param, const model *wsmodel)
+{
 	int i,j;
 	int l = prob->l;
 	int n = prob->n;
@@ -3052,6 +3074,14 @@ model* train(const problem *prob, const parameter *param)
 		}
 		else
 		{
+			if (wsmodel != NULL)
+				if (nr_class != wsmodel->nr_class)
+				{
+					fprintf(stderr, "ERROR: # classes in traing data different from # classes in the warm-start model\n");
+					fprintf(stderr, "ERROR: We do not handle such a situation now\n");
+					exit(1);
+				}
+			
 			if(nr_class == 2)
 			{
 				model_->w=Malloc(double, w_size);
@@ -3063,7 +3093,19 @@ model* train(const problem *prob, const parameter *param)
 				for(; k<sub_prob.l; k++)
 					sub_prob.y[k] = -1;
 
-				if(param->init_sol != NULL)
+				if(wsmodel != NULL)
+				{
+					int min_nr_feature = min(w_size, wsmodel->nr_feature);
+					if(wsmodel->label[0] == model_->label[0])
+						for(i=0;i<min_nr_feature;i++)
+							model_->w[i] = wsmodel->w[i];
+					else
+						for(i=0;i<min_nr_feature;i++)
+							model_->w[i] = -wsmodel->w[i];
+					for(i=min_nr_feature;i<w_size;i++)
+						model_->w[i] = 0;
+				}
+				else if(param->init_sol != NULL)
 					for(i=0;i<w_size;i++)
 						model_->w[i] = param->init_sol[i];
 				else
@@ -3076,6 +3118,22 @@ model* train(const problem *prob, const parameter *param)
 			{
 				model_->w=Malloc(double, w_size*nr_class);
 				double *w=Malloc(double, w_size);
+
+				int min_nr_feature = w_size;
+				int nr_matched_label = 0;
+				struct label_index *label_map = NULL;
+				if(wsmodel != NULL)
+				{
+					min_nr_feature = min(w_size, wsmodel->nr_feature);
+					label_map = Malloc(struct label_index, wsmodel->nr_class);
+					for(i=0;i<wsmodel->nr_class;i++)
+					{
+						label_map[i].label = wsmodel->label[i];
+						label_map[i].index = i;
+					}
+					qsort(label_map, wsmodel->nr_class, sizeof(struct label_index), label_compare);
+				}
+
 				for(i=0;i<nr_class;i++)
 				{
 					int si = start[i];
@@ -3089,7 +3147,25 @@ model* train(const problem *prob, const parameter *param)
 					for(; k<sub_prob.l; k++)
 						sub_prob.y[k] = -1;
 
-					if(param->init_sol != NULL)
+					int index = -1;
+					if(wsmodel != NULL)
+					{
+						struct label_index key;
+						struct label_index *found;
+						key.label = model_->label[i];
+						found = (struct label_index*)bsearch(&key, label_map, wsmodel->nr_class, sizeof(struct label_index), label_compare);
+						if(found != NULL)
+							index = found->index;
+					}
+					if(index >= 0)
+					{
+						for(j=0;j<min_nr_feature;j++)
+							w[j] = wsmodel->w[j*wsmodel->nr_class+index];
+						for(j=min_nr_feature;j<w_size;j++)
+							w[j] = 0;
+						nr_matched_label++;
+					}
+					else if(param->init_sol != NULL)
 						for(j=0;j<w_size;j++)
 							w[j] = param->init_sol[j*nr_class+i];
 					else
@@ -3102,6 +3178,12 @@ model* train(const problem *prob, const parameter *param)
 						model_->w[j*nr_class+i] = w[j];
 				}
 				free(w);
+				if(wsmodel != NULL)
+				{
+					if(nr_matched_label != nr_class || nr_class != wsmodel->nr_class)
+						fprintf(stderr,"WARNING: class labels in training data do not match those in the initial model.\n");
+					free(label_map);
+				}
 			}
 
 		}
