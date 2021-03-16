@@ -1,6 +1,8 @@
 CXX ?= g++
 CC ?= gcc
-CFLAGS = -Wall -Wconversion -O3 -fPIC
+CFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp
+# Uncomment the following line to turn on parallelization for CV
+# CFLAGS += -DCV_OMP
 LIBS = blas/blas.a
 SHVER = 4
 OS = $(shell uname)
@@ -14,7 +16,7 @@ lib: linear.o newton.o blas/blas.a
 	else \
 		SHARED_LIB_FLAG="-shared -Wl,-soname,liblinear.so.$(SHVER)"; \
 	fi; \
-	$(CXX) $${SHARED_LIB_FLAG} linear.o newton.o blas/blas.a -o liblinear.so.$(SHVER)
+	$(CXX) -fopenmp $${SHARED_LIB_FLAG} linear.o newton.o blas/blas.a -o liblinear.so.$(SHVER)
 
 train: newton.o linear.o train.c blas/blas.a
 	$(CXX) $(CFLAGS) -o train train.c newton.o linear.o $(LIBS)

@@ -32,6 +32,7 @@ struct parameter
 	/* these are for training only */
 	double eps;             /* stopping tolerance */
 	double C;
+	int nr_thread;
 	int nr_weight;
 	int *weight_label;
 	double* weight;
