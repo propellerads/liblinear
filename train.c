@@ -58,6 +58,7 @@ void exit_with_help()
 	"-C : find parameters (C for -s 0, 2 and C, p for -s 11)\n"
 	"-m nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11)\n"
 	"-q : quiet mode (no outputs)\n"
+	"-W weight_file: set weight file (for all solvers except -s 21)\n"
 	);
 	exit(1);
 }
@@ -98,6 +99,7 @@ struct feature_node *x_space;
 struct parameter param;
 struct problem prob;
 struct model* model_;
+char *weight_file;
 int flag_cross_validation;
 int flag_find_parameters;
 int flag_omp;
@@ -144,6 +146,7 @@ int main(int argc, char **argv)
 	destroy_param(&param);
 	free(prob.y);
 	free(prob.x);
+	free(prob.W);
 	free(x_space);
 	free(line);
 
@@ -229,6 +232,7 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 	param.weight = NULL;
 	param.init_sol = NULL;
 	flag_cross_validation = 0;
+	weight_file = NULL;
 	flag_C_specified = 0;
 	flag_p_specified = 0;
 	flag_solver_specified = 0;
@@ -297,6 +301,10 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			case 'q':
 				print_func = &print_null;
 				i--;
+				break;
+
+			case 'W':
+				weight_file = argv[i];
 				break;
 
 			case 'C':
@@ -469,6 +477,7 @@ void read_problem(const char *filename)
 
 	prob.y = Malloc(double,prob.l);
 	prob.x = Malloc(struct feature_node *,prob.l);
+	prob.W = Malloc(double,prob.l);
 	x_space = Malloc(struct feature_node,elements+prob.l);
 
 	max_index = 0;
@@ -529,4 +538,21 @@ void read_problem(const char *filename)
 		prob.n=max_index;
 
 	fclose(fp);
+
+	if(weight_file)
+	{
+		fp = fopen(weight_file,"r");
+		for(i=0;i<prob.l;i++)
+			if (fscanf(fp,"%lf",&prob.W[i]) != 1)
+			{
+				fprintf(stderr, "Error in reading weights\n");
+				exit(1);
+			}
+		fclose(fp);
+	}
+	else
+	{
+		for(i=0;i<prob.l;i++)
+			prob.W[i] = 1;
+	}
 }
