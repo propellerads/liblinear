@@ -241,9 +241,11 @@ double l2r_erm_fun::fun(double *w)
 	wTw = 0;
 	Xv(w, wx);
 
-#pragma omp parallel for private(i) reduction(+:wTw) schedule(static)
+    double l_wTw = wTw;
+#pragma omp parallel for private(i) reduction(+:l_wTw) schedule(static)
 	for(i=0;i<w_size;i++)
-		wTw += w[i]*w[i];
+		l_wTw += w[i]*w[i];
+	wTw = l_wTw;
 	if(regularize_bias == 0)
 		wTw -= w[w_size-1]*w[w_size-1];
 #pragma omp parallel for private(i) reduction(+:f) schedule(static)
