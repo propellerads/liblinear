@@ -55,8 +55,9 @@ void exit_with_help()
 	"       (for -s 0, 2, 5, 6, 11)\n"
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
-	"-C : find parameters (C for -s 0, 2 and C, p for -s 11)\n"
 	"-m nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11)\n"
+	"-i initial model file: use a previously trained model for incremental/decremental training (only for -s 0 and 2)\n"
+	"-C : find parameters (C for -s 0, 2 and C, p for -s 11, can't exist with -i option)\n"
 	"-q : quiet mode (no outputs)\n"
 	"-W weight_file: set weight file (for all solvers except -s 21)\n"
 	);
@@ -100,7 +101,9 @@ struct parameter param;
 struct problem prob;
 struct model* model_;
 char *weight_file;
+struct model* initial_model;
 int flag_cross_validation;
+int flag_warm_start;
 int flag_find_parameters;
 int flag_omp;
 int flag_C_specified;
@@ -124,7 +127,11 @@ int main(int argc, char **argv)
 		fprintf(stderr,"ERROR: %s\n",error_msg);
 		exit(1);
 	}
-
+	if( flag_find_parameters && flag_warm_start)
+	{
+		fprintf(stderr,"ERROR: Option -C and -i can't both exist\n");
+		exit(1);
+	}
 	if (flag_find_parameters)
 	{
 		do_find_parameters();
@@ -135,7 +142,15 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		model_=train(&prob, &param);
+		if(flag_warm_start)
+		{
+			if(prob.n != initial_model->nr_feature)
+				fprintf(stderr,"WARNING: The number of features in the input file does not match that in the initial model\n");
+			model_=warm_start_train(&prob, &param, initial_model);
+			free_and_destroy_model(&initial_model);
+		}
+		else
+			model_=train(&prob, &param);
 		if(save_model(model_file_name, model_))
 		{
 			fprintf(stderr,"can't save model to file %s\n",model_file_name);
@@ -233,6 +248,7 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 	param.init_sol = NULL;
 	flag_cross_validation = 0;
 	weight_file = NULL;
+	flag_warm_start = 0;
 	flag_C_specified = 0;
 	flag_p_specified = 0;
 	flag_solver_specified = 0;
@@ -307,6 +323,14 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 				weight_file = argv[i];
 				break;
 
+			case 'i':
+				flag_warm_start = 1;
+				if((initial_model=load_model(argv[i]))==0)
+				{
+					fprintf(stderr,"can't open initial model file %s\n",argv[i]);
+					exit_with_help();
+				}
+				break;
 			case 'C':
 				flag_find_parameters = 1;
 				i--;
@@ -322,6 +346,17 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 				exit_with_help();
 				break;
 		}
+	}
+
+	if(flag_warm_start)
+	{
+		if(param.solver_type != L2R_LR && param.solver_type != L2R_L2LOSS_SVC)
+		{
+			fprintf(stderr,"-i is supported only for -s 0 and 2\n");
+			exit(1);
+		}
+		if(param.solver_type != initial_model->param.solver_type)
+			fprintf(stderr,"Warning: the solver type of initial model dose not match your -s option\n");
 	}
 
 	set_print_string_function(print_func);
