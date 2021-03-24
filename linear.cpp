@@ -3467,6 +3467,11 @@ model* warm_start_train(const problem *prob, const parameter *param, const model
 							model_->w[i] = -wsmodel->w[i];
 					for(i=min_nr_feature;i<w_size;i++)
 						model_->w[i] = 0;
+					// Initialize bias
+					if (model_->bias>=0 && wsmodel->bias>=0) {
+						printf("Initialize bias to %f\n", wsmodel->w[wsmodel->nr_feature]);
+						model_->w[model_->nr_feature] = wsmodel->w[wsmodel->nr_feature];
+					}
 				}
 				else if(param->init_sol != NULL)
 					for(i=0;i<w_size;i++)
