@@ -7,11 +7,11 @@ from glob import glob
 import sys
 
 try:
+    import numpy as np
     import scipy
     from scipy import sparse
 except:
     scipy = None
-    sparse = None
 
 if sys.version_info[0] < 3:
     range = xrange
@@ -34,7 +34,7 @@ except:
         if sys.platform == 'win32':
             liblinear = CDLL(path.join(dirname, r'..\..\windows\liblinear.dll'))
         else:
-            liblinear = CDLL(path.join(dirname, '../../liblinear.so.4'))
+            liblinear = CDLL(path.join(dirname, '../../liblinear.so.5'))
     except:
     # For unix the prefix 'lib' is not considered.
         if find_library('linear'):
@@ -82,15 +82,15 @@ def gen_feature_nodearray(xi, feature_max=None):
 
     xi_shift = 0 # ensure correct indices of xi
     if scipy and isinstance(xi, tuple) and len(xi) == 2\
-            and isinstance(xi[0], scipy.ndarray) and isinstance(xi[1], scipy.ndarray): # for a sparse vector
+            and isinstance(xi[0], np.ndarray) and isinstance(xi[1], np.ndarray): # for a sparse vector
         index_range = xi[0] + 1 # index starts from 1
         if feature_max:
-            index_range = index_range[scipy.where(index_range <= feature_max)]
-    elif scipy and isinstance(xi, scipy.ndarray):
+            index_range = index_range[np.where(index_range <= feature_max)]
+    elif scipy and isinstance(xi, np.ndarray):
         xi_shift = 1
         index_range = xi.nonzero()[0] + 1 # index starts from 1
         if feature_max:
-            index_range = index_range[scipy.where(index_range <= feature_max)]
+            index_range = index_range[np.where(index_range <= feature_max)]
     elif isinstance(xi, (dict, list, tuple)):
         if isinstance(xi, dict):
             index_range = xi.keys()
@@ -110,7 +110,7 @@ def gen_feature_nodearray(xi, feature_max=None):
     ret[-2].index = -1
 
     if scipy and isinstance(xi, tuple) and len(xi) == 2\
-            and isinstance(xi[0], scipy.ndarray) and isinstance(xi[1], scipy.ndarray): # for a sparse vector
+            and isinstance(xi[0], np.ndarray) and isinstance(xi[1], np.ndarray): # for a sparse vector
         for idx, j in enumerate(index_range):
             ret[idx].index = j
             ret[idx].value = (xi[1])[idx]
@@ -148,9 +148,11 @@ def csr_to_problem_nojit(l, x_val, x_ind, x_rowptr, prob_val, prob_ind, prob_row
 
 def csr_to_problem(x, prob):
     # Extra space for termination node and (possibly) bias term
-    x_space = prob.x_space = scipy.empty((x.nnz+x.shape[0]*2), dtype=feature_node)
-    prob.rowptr = x.indptr.copy()
-    prob.rowptr[1:] += 2*scipy.arange(1,x.shape[0]+1)
+    x_space = prob.x_space = np.empty((x.nnz+x.shape[0]*2), dtype=feature_node)
+    # rowptr has to be a 64bit integer because it will later be used for pointer arithmetic,
+    # which overflows when the added pointer points to an address that is numerically high.
+    prob.rowptr = x.indptr.astype(np.int64, copy=True)
+    prob.rowptr[1:] += 2*np.arange(1,x.shape[0]+1)
     prob_ind = x_space["index"]
     prob_val = x_space["value"]
     prob_ind[:] = -1
@@ -165,17 +167,17 @@ class problem(Structure):
     _fields_ = genFields(_names, _types)
 
     def __init__(self, y, x, bias = -1):
-        if (not isinstance(y, (list, tuple))) and (not (scipy and isinstance(y, scipy.ndarray))):
+        if (not isinstance(y, (list, tuple))) and (not (scipy and isinstance(y, np.ndarray))):
             raise TypeError("type of y: {0} is not supported!".format(type(y)))
 
         if isinstance(x, (list, tuple)):
             if len(y) != len(x):
                 raise ValueError("len(y) != len(x)")
-        elif scipy != None and isinstance(x, (scipy.ndarray, sparse.spmatrix)):
+        elif scipy != None and isinstance(x, (np.ndarray, sparse.spmatrix)):
             if len(y) != x.shape[0]:
                 raise ValueError("len(y) != len(x)")
-            if isinstance(x, scipy.ndarray):
-                x = scipy.ascontiguousarray(x) # enforce row-major
+            if isinstance(x, np.ndarray):
+                x = np.ascontiguousarray(x) # enforce row-major
             if isinstance(x, sparse.spmatrix):
                 x = x.tocsr()
                 pass
@@ -197,8 +199,8 @@ class problem(Structure):
         self.n = max_idx
 
         self.y = (c_double * l)()
-        if scipy != None and isinstance(y, scipy.ndarray):
-            scipy.ctypeslib.as_array(self.y, (self.l,))[:] = y
+        if scipy != None and isinstance(y, np.ndarray):
+            np.ctypeslib.as_array(self.y, (self.l,))[:] = y
         else:
             for i, yi in enumerate(y): self.y[i] = yi
 
@@ -206,7 +208,7 @@ class problem(Structure):
         if scipy != None and isinstance(x, sparse.csr_matrix):
             base = addressof(self.x_space.ctypes.data_as(POINTER(feature_node))[0])
             x_ptr = cast(self.x, POINTER(c_uint64))
-            x_ptr = scipy.ctypeslib.as_array(x_ptr,(self.l,))
+            x_ptr = np.ctypeslib.as_array(x_ptr,(self.l,))
             x_ptr[:] = self.rowptr[:-1]*sizeof(feature_node)+base
         else:
             for i, xi in enumerate(self.x_space): self.x[i] = xi
@@ -354,10 +356,12 @@ class parameter(Structure):
 
         if self.flag_omp:
             if not self.flag_solver_specified:
+                print("Solver not specified. Using -s 2")
                 self.solver_type = L2R_L2LOSS_SVC
                 self.flag_solver_specified = True
-            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L2LOSS_SVC_DUAL, L2R_L1LOSS_SVC_DUAL, L1R_LR, L1R_L2LOSS_SVC]:
-                raise ValueError("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 5, 6, 11 now")
+            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L1LOSS_SVC_DUAL, L2R_L2LOSS_SVC_DUAL, L1R_L2LOSS_SVC, L1R_LR, ONECLASS_SVM]:
+                print("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11, 21 now; use single-core solvers instead.\n")
+                self.nr_thread = 1
 
         if self.eps == float('inf'):
             if self.solver_type in [L2R_LR, L2R_L2LOSS_SVC]:
