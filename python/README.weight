@@ -55,7 +55,7 @@ instance weights. We only show differences below.
 
     Examples:
 
-	>>> from liblinearutil import *
+	>>> from liblinear.liblinearutil import *
 	>>> y, x = svm_read_problem('../heart_scale')
 
 	# Without Scipy support

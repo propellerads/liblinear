@@ -17,41 +17,46 @@ void exit_with_help()
 	"options:\n"
 	"-s type : set type of solver (default 1)\n"
 	"  for multi-class classification\n"
-	"	 0 -- L2-regularized logistic regression (primal)\n"
-	"	 1 -- L2-regularized L2-loss support vector classification (dual)\n"
-	"	 2 -- L2-regularized L2-loss support vector classification (primal)\n"
-	"	 3 -- L2-regularized L1-loss support vector classification (dual)\n"
-	"	 4 -- support vector classification by Crammer and Singer\n"
-	"	 5 -- L1-regularized L2-loss support vector classification\n"
-	"	 6 -- L1-regularized logistic regression\n"
-	"	 7 -- L2-regularized logistic regression (dual)\n"
+	"        0 -- L2-regularized logistic regression (primal)\n"
+	"        1 -- L2-regularized L2-loss support vector classification (dual)\n"
+	"        2 -- L2-regularized L2-loss support vector classification (primal)\n"
+	"        3 -- L2-regularized L1-loss support vector classification (dual)\n"
+	"        4 -- support vector classification by Crammer and Singer\n"
+	"        5 -- L1-regularized L2-loss support vector classification\n"
+	"        6 -- L1-regularized logistic regression\n"
+	"        7 -- L2-regularized logistic regression (dual)\n"
 	"  for regression\n"
-	"	11 -- L2-regularized L2-loss support vector regression (primal)\n"
-	"	12 -- L2-regularized L2-loss support vector regression (dual)\n"
-	"	13 -- L2-regularized L1-loss support vector regression (dual)\n"
+	"       11 -- L2-regularized L2-loss support vector regression (primal)\n"
+	"       12 -- L2-regularized L2-loss support vector regression (dual)\n"
+	"       13 -- L2-regularized L1-loss support vector regression (dual)\n"
+	"  for outlier detection\n"
+	"       21 -- one-class support vector machine (dual)\n"
 	"-c cost : set the parameter C (default 1)\n"
 	"-p epsilon : set the epsilon in loss function of SVR (default 0.1)\n"
+	"-n nu : set the parameter nu of one-class SVM (default 0.5)\n"
 	"-e epsilon : set tolerance of termination criterion\n"
-	"	-s 0 and 2\n"
-	"		|f'(w)|_2 <= eps*min(pos,neg)/l*|f'(w0)|_2,\n"
-	"		where f is the primal function and pos/neg are # of\n"
-	"		positive/negative data (default 0.01)\n"
-	"	-s 11\n"
-	"		|f'(w)|_2 <= eps*|f'(w0)|_2 (default 0.001)\n"
-	"	-s 1, 3, 4, and 7\n"
-	"		Dual maximal violation <= eps; similar to libsvm (default 0.1)\n"
-	"	-s 5 and 6\n"
-	"		|f'(w)|_1 <= eps*min(pos,neg)/l*|f'(w0)|_1,\n"
-	"		where f is the primal function (default 0.01)\n"
-	"	-s 12 and 13\n"
-	"		|f'(alpha)|_1 <= eps |f'(alpha0)|,\n"
-	"		where f is the dual function (default 0.1)\n"
+	"       -s 0 and 2\n"
+	"               |f'(w)|_2 <= eps*min(pos,neg)/l*|f'(w0)|_2,\n"
+	"               where f is the primal function and pos/neg are # of\n"
+	"               positive/negative data (default 0.01)\n"
+	"       -s 11\n"
+	"               |f'(w)|_2 <= eps*|f'(w0)|_2 (default 0.0001)\n"
+	"       -s 1, 3, 4, 7, and 21\n"
+	"               Dual maximal violation <= eps; similar to libsvm (default 0.1 except 0.01 for -s 21)\n"
+	"      -s 5 and 6\n"
+	"               |f'(w)|_1 <= eps*min(pos,neg)/l*|f'(w0)|_1,\n"
+	"               where f is the primal function (default 0.01)\n"
+	"       -s 12 and 13\n"
+	"               |f'(alpha)|_1 <= eps |f'(alpha0)|,\n"
+	"               where f is the dual function (default 0.1)\n"
 	"-B bias : if bias >= 0, instance x becomes [x; bias]; if < 0, no bias term added (default -1)\n"
+	"-R : not regularize the bias; must with -B 1 to have the bias; DON'T use this unless you know what it is\n"
+	"       (for -s 0, 2, 5, 6, 11)\n"
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
-	"-C : find parameter C (only for -s 0 and 2)\n"
+	"-C : find parameters (C for -s 0, 2 and C, p for -s 11)\n"
 	"-q : quiet mode (no outputs)\n"
-	"-W weight_file: set weight file\n"
+	"-W weight_file: set weight file (for all solvers except -s 21)\n"
 	);
 	exit(1);
 }
@@ -86,7 +91,7 @@ static char* readline(FILE *input)
 void parse_command_line(int argc, char **argv, char *input_file_name, char *model_file_name);
 void read_problem(const char *filename);
 void do_cross_validation();
-void do_find_parameter_C();
+void do_find_parameters();
 
 struct feature_node *x_space;
 struct parameter param;
@@ -94,8 +99,9 @@ struct problem prob;
 struct model* model_;
 char *weight_file;
 int flag_cross_validation;
-int flag_find_C;
+int flag_find_parameters;
 int flag_C_specified;
+int flag_p_specified;
 int flag_solver_specified;
 int nr_fold;
 double bias;
@@ -116,9 +122,9 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (flag_find_C)
+	if (flag_find_parameters)
 	{
-		do_find_parameter_C();
+		do_find_parameters();
 	}
 	else if(flag_cross_validation)
 	{
@@ -144,17 +150,24 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-void do_find_parameter_C()
+void do_find_parameters()
 {
-	double start_C, best_C, best_rate;
-	double max_C = 1024;
+	double start_C, start_p, best_C, best_p, best_score;
 	if (flag_C_specified)
 		start_C = param.C;
 	else
 		start_C = -1.0;
+	if (flag_p_specified)
+		start_p = param.p;
+	else
+		start_p = -1.0;
+
 	printf("Doing parameter search with %d-fold cross validation.\n", nr_fold);
-	find_parameter_C(&prob, &param, nr_fold, start_C, max_C, &best_C, &best_rate);
-	printf("Best C = %g  CV accuracy = %g%%\n", best_C, 100.0*best_rate);
+	find_parameters(&prob, &param, nr_fold, start_C, start_p, &best_C, &best_p, &best_score);
+	if(param.solver_type == L2R_LR || param.solver_type == L2R_L2LOSS_SVC)
+		printf("Best C = %g  CV accuracy = %g%%\n", best_C, 100.0*best_score);
+	else if(param.solver_type == L2R_L2LOSS_SVR)
+		printf("Best C = %g Best p = %g  CV MSE = %g\n", best_C, best_p, best_score);
 }
 
 void do_cross_validation()
@@ -201,22 +214,25 @@ void do_cross_validation()
 void parse_command_line(int argc, char **argv, char *input_file_name, char *model_file_name)
 {
 	int i;
-	void (*print_func)(const char*) = NULL;	// default printing to stdout
+	void (*print_func)(const char*) = NULL;  // default printing to stdout
 
 	// default values
 	param.solver_type = L2R_L2LOSS_SVC_DUAL;
 	param.C = 1;
-	param.eps = INF; // see setting below
 	param.p = 0.1;
+	param.nu = 0.5;
+	param.eps = INF; // see setting below
 	param.nr_weight = 0;
+	param.regularize_bias = 1;
 	param.weight_label = NULL;
 	param.weight = NULL;
 	param.init_sol = NULL;
 	flag_cross_validation = 0;
 	weight_file = NULL;
 	flag_C_specified = 0;
+	flag_p_specified = 0;
 	flag_solver_specified = 0;
-	flag_find_C = 0;
+	flag_find_parameters = 0;
 	bias = -1;
 
 	// parse options
@@ -238,7 +254,12 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 				break;
 
 			case 'p':
+				flag_p_specified = 1;
 				param.p = atof(argv[i]);
+				break;
+
+			case 'n':
+				param.nu = atof(argv[i]);
 				break;
 
 			case 'e':
@@ -271,13 +292,18 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 				print_func = &print_null;
 				i--;
 				break;
-				
+
 			case 'W':
 				weight_file = argv[i];
 				break;
-				
+
 			case 'C':
-				flag_find_C = 1;
+				flag_find_parameters = 1;
+				i--;
+				break;
+
+			case 'R':
+				param.regularize_bias = 0;
 				i--;
 				break;
 
@@ -309,7 +335,7 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 	}
 
 	// default solver for parameter selection is L2R_L2LOSS_SVC
-	if(flag_find_C)
+	if(flag_find_parameters)
 	{
 		if(!flag_cross_validation)
 			nr_fold = 5;
@@ -318,9 +344,9 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			fprintf(stderr, "Solver not specified. Using -s 2\n");
 			param.solver_type = L2R_L2LOSS_SVC;
 		}
-		else if(param.solver_type != L2R_LR && param.solver_type != L2R_L2LOSS_SVC)
+		else if(param.solver_type != L2R_LR && param.solver_type != L2R_L2LOSS_SVC && param.solver_type != L2R_L2LOSS_SVR)
 		{
-			fprintf(stderr, "Warm-start parameter search only available for -s 0 and -s 2\n");
+			fprintf(stderr, "Warm-start parameter search only available for -s 0, -s 2 and -s 11\n");
 			exit_with_help();
 		}
 	}
@@ -334,7 +360,7 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 				param.eps = 0.01;
 				break;
 			case L2R_L2LOSS_SVR:
-				param.eps = 0.001;
+				param.eps = 0.0001;
 				break;
 			case L2R_L2LOSS_SVC_DUAL:
 			case L2R_L1LOSS_SVC_DUAL:
@@ -349,6 +375,9 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			case L2R_L1LOSS_SVR_DUAL:
 			case L2R_L2LOSS_SVR_DUAL:
 				param.eps = 0.1;
+				break;
+			case ONECLASS_SVM:
+				param.eps = 0.01;
 				break;
 		}
 	}
@@ -456,11 +485,15 @@ void read_problem(const char *filename)
 
 	fclose(fp);
 
-	if(weight_file) 
+	if(weight_file)
 	{
 		fp = fopen(weight_file,"r");
 		for(i=0;i<prob.l;i++)
-			fscanf(fp,"%lf",&prob.W[i]);
+			if (fscanf(fp,"%lf",&prob.W[i]) != 1)
+			{
+				fprintf(stderr, "Error in reading weights\n");
+				exit(1);
+			}
 		fclose(fp);
 	}
 	else
