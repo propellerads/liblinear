@@ -55,6 +55,7 @@ struct model
 };
 
 struct model* train(const struct problem *prob, const struct parameter *param);
+struct model* warm_start_train(const struct problem *prob, const struct parameter *param, const struct model *wsmodel);
 void cross_validation(const struct problem *prob, const struct parameter *param, int nr_fold, double *target);
 void find_parameters(const struct problem *prob, const struct parameter *param, int nr_fold, double start_C, double start_p, double *best_C, double *best_p, double *best_score);
 

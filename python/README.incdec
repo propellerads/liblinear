@@ -1,0 +1,30 @@
+Introduction
+============
+
+This tool provides a Python interface to LIBLINEAR for incremental and
+decremental learning.
+
+
+Examples
+========
+
+matlab> [label, instance] = libsvmread('../heart_scale');
+matlab> wsmodel = train(label, instance, '-s 2');
+matlab> save('model.mat', 'wsmodel');
+
+matlab> load('model.mat');
+matlab> [label, instance] = libsvmread('../heart_scale');
+matlab> model = train(label, instance, '-s 2 -i wsmodel');
+
+
+>>> import scipy
+>>> from liblinear.liblinearutil import *
+
+>>> y, x = svm_read_problem('../heart_scale', return_scipy = True) # y: ndarray, x: csr_matrix
+>>> m = train(y, x, '-s 2')
+>>> save_model('heart_scale.model', m)
+
+# Use -i to load the model saved earlier for continuous training
+
+>>> m = train(y, x, '-s 2 -e 0.0001 -i heart_scale.model')
+
