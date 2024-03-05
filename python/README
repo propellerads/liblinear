@@ -67,6 +67,14 @@ and system-wide installation.
 
     Please note that you must keep the sources after the installation.
 
+    > pip install --user -e .
+
+    The option --user would install the package in the home directory
+    instead of the system directory, and thus does not require the
+    root privilege.
+
+    Please note that you must keep the sources after the installation.
+
     In addition, DON'T use the following FAILED commands
 
     > python setup.py install (failed to run at the python directory)

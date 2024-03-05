@@ -116,6 +116,7 @@ def main():
         author="ML group @ National Taiwan University",
         author_email="cjlin@csie.ntu.edu.tw",
         url="https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear",
+        license=license_name,
         install_requires=["scipy"],
         ext_modules=[
             Extension(

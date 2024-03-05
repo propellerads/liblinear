@@ -4,7 +4,7 @@ on:
   # on new tag
   push:
     tags:
-      - "*"
+      - '*'
 
   # manually trigger
   workflow_dispatch:
