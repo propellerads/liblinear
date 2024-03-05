@@ -271,6 +271,8 @@ class parameter(Structure):
         self.flag_C_specified = False
         self.flag_p_specified = False
         self.flag_solver_specified = False
+        self.initial_model_file = None
+        self.flag_warm_start = False
         self.flag_find_parameters = False
         self.nr_fold = 0
         self.print_func = cast(None, PRINT_STRING_FUN)
@@ -323,6 +325,10 @@ class parameter(Structure):
                 weight += [float(argv[i])]
             elif argv[i] == "-q":
                 self.print_func = PRINT_STRING_FUN(print_null)
+            elif argv[i] == "-i":
+                i = i + 1
+                self.initial_model_file = argv[i]
+                self.flag_warm_start = True                
             elif argv[i] == "-C":
                 self.flag_find_parameters = True
             elif argv[i] == "-R":
@@ -427,6 +433,7 @@ def toPyModel(model_ptr):
     return m
 
 fillprototype(liblinear.train, POINTER(model), [POINTER(problem), POINTER(parameter)])
+fillprototype(liblinear.warm_start_train, POINTER(model), [POINTER(problem), POINTER(parameter), POINTER(model)])
 fillprototype(liblinear.find_parameters, None, [POINTER(problem), POINTER(parameter), c_int, c_double, c_double, POINTER(c_double), POINTER(c_double), POINTER(c_double)])
 fillprototype(liblinear.cross_validation, None, [POINTER(problem), POINTER(parameter), c_int, POINTER(c_double)])
 

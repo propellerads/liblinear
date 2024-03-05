@@ -127,6 +127,9 @@ def train(arg1, arg2=None, arg3=None):
     if err_msg :
         raise ValueError('Error: %s' % err_msg)
 
+    if param.flag_find_parameters and param.flag_warm_start:
+        raise ValueError('Option -C and -i can\'t both exist')
+    
     if param.flag_find_parameters:
         nr_fold = param.nr_fold
         best_C = c_double()
@@ -161,7 +164,13 @@ def train(arg1, arg2=None, arg3=None):
             print("Cross Validation Accuracy = %g%%" % ACC)
             return ACC
     else:
-        m = liblinear.train(prob, param)
+        if param.flag_warm_start:
+            initial_model = load_model(param.initial_model_file)
+            if prob.n != initial_model.nr_feature:
+                raise ValueError('WARNING: The number of features in the input file does not match that in the initial model')
+            m = liblinear.warm_start_train(prob, param, initial_model)
+        else:
+            m = liblinear.train(prob, param)
         m = toPyModel(m)
 
         return m

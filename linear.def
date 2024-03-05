@@ -22,3 +22,4 @@ EXPORTS
     find_parameters @20
     get_decfun_rho @21
     check_oneclass_model @22
+    warm_start_train @23
