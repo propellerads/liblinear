@@ -64,7 +64,7 @@ instance weights. We only show differences below.
 
 	# With Scipy support
 	>>> import scipy
-	>>> W = scipy.asarray([1] * len(y))
+	>>> W = np.asarray([1] * len(y))
 	>>> W[0] = 10
 
 	>>> prob = problem(W, y, x)
