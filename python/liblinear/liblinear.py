@@ -286,6 +286,8 @@ class parameter(Structure):
         self.flag_C_specified = False
         self.flag_p_specified = False
         self.flag_solver_specified = False
+        self.initial_model_file = None
+        self.flag_warm_start = False
         self.flag_find_parameters = False
         self.flag_omp = False
         self.nr_fold = 0
@@ -343,6 +345,10 @@ class parameter(Structure):
                 weight += [float(argv[i])]
             elif argv[i] == "-q":
                 self.print_func = PRINT_STRING_FUN(print_null)
+            elif argv[i] == "-i":
+                i = i + 1
+                self.initial_model_file = argv[i]
+                self.flag_warm_start = True                
             elif argv[i] == "-C":
                 self.flag_find_parameters = True
             elif argv[i] == "-R":
@@ -370,10 +376,12 @@ class parameter(Structure):
 
         if self.flag_omp:
             if not self.flag_solver_specified:
+                print("Solver not specified. Using -s 2")
                 self.solver_type = L2R_L2LOSS_SVC
                 self.flag_solver_specified = True
-            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L2LOSS_SVC_DUAL, L2R_L1LOSS_SVC_DUAL, L1R_LR, L1R_L2LOSS_SVC]:
-                raise ValueError("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 5, 6, 11 now")
+            elif self.solver_type not in [L2R_LR, L2R_L2LOSS_SVC, L2R_L2LOSS_SVR, L2R_L1LOSS_SVC_DUAL, L2R_L2LOSS_SVC_DUAL, L1R_L2LOSS_SVC, L1R_LR, ONECLASS_SVM]:
+                print("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11, 21 now; use single-core solvers instead.\n")
+                self.nr_thread = 1
 
         if self.eps == float('inf'):
             if self.solver_type in [L2R_LR, L2R_L2LOSS_SVC]:
@@ -454,6 +462,7 @@ def toPyModel(model_ptr):
     return m
 
 fillprototype(liblinear.train, POINTER(model), [POINTER(problem), POINTER(parameter)])
+fillprototype(liblinear.warm_start_train, POINTER(model), [POINTER(problem), POINTER(parameter), POINTER(model)])
 fillprototype(liblinear.find_parameters, None, [POINTER(problem), POINTER(parameter), c_int, c_double, c_double, POINTER(c_double), POINTER(c_double), POINTER(c_double)])
 fillprototype(liblinear.cross_validation, None, [POINTER(problem), POINTER(parameter), c_int, POINTER(c_double)])
 

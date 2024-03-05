@@ -36,6 +36,10 @@ Four files are modified: linear.h, linear.cpp, train.c and
 tron.cpp. The major change is to support the trust region Newton
 method (TRON) to accept a model vector w as the initial point.
 
+Three files are modified: linear.h, linear.cpp, and train.c. The major
+change is to let the Newton method accept a model vector w as the
+initial point.
+
 References
 ==========
 
@@ -43,6 +47,10 @@ C.-H. Tsai, C.-Y. Lin, and C.-J. Lin. Incremental and Decremental Training for L
 www.csie.ntu.edu.tw/~cjlin/papers/ws/warm-start.pdf
 KDD 2014.
 
+
+
+www.csie.ntu.edu.tw/~cjlin/papers/ws/inc-dec.pdf
+KDD 2014.
 
 
 For any questions and comments, please email

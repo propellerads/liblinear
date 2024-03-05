@@ -1,6 +1,6 @@
--------------------------------------
---- Python interface of LIBLINEAR ---
--------------------------------------
+------------------------------------------------
+--- Multi-core Python Interface of LIBLINEAR ---
+------------------------------------------------
 
 Table of Contents
 =================
@@ -19,17 +19,19 @@ Introduction
 ============
 
 Python (http://www.python.org/) is a programming language suitable for rapid
-development. This tool provides a simple Python interface to LIBLINEAR, a library
-for support vector machines (http://www.csie.ntu.edu.tw/~cjlin/liblinear). The
+development. This tool provides a simple Python interface to multi-core LIBLINEAR, a library
+for support vector machines in multi-core machines (http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear). The
 interface is very easy to use as the usage is the same as that of LIBLINEAR. The
 interface is developed with the built-in Python library "ctypes."
+
+Details of multi-core implementations can be found at http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear
 
 Installation via PyPI
 =====================
 
 To install the interface from PyPI, execute the following command:
 
-> pip install -U liblinear-official
+> pip install -U liblinear-multicore
 
 Installation via Sources
 ========================
@@ -49,14 +51,6 @@ and system-wide installation.
     This generates a .so file in the LIBLINEAR main directory and you
     can run the interface in the current python directory.
     
-    For Windows, the shared library liblinear.dll is ready in the
-    directory `..\windows' and you can directly run the interface in
-    the current python directory. You can copy liblinear.dll to the
-    system directory (e.g., `C:\WINDOWS\system32\') to make it
-    system-widely available. To regenerate liblinear.dll, please
-    follow the instruction of building Windows binaries in LIBLINEAR
-    README.
-
 - System-wide installation:
 
     Type
@@ -73,8 +67,13 @@ and system-wide installation.
 
     Please note that you must keep the sources after the installation.
 
-    For Windows, to run the above command, Microsoft Visual C++ and
-    other tools are needed.
+    > pip install --user -e .
+
+    The option --user would install the package in the home directory
+    instead of the system directory, and thus does not require the
+    root privilege.
+
+    Please note that you must keep the sources after the installation.
 
     In addition, DON'T use the following FAILED commands
 
@@ -91,10 +90,13 @@ functions in liblinearutil.py and commonutil.py (shared with LIBSVM
 and imported by svmutil.py). The usage is the same as the LIBLINEAR
 MATLAB interface.
 
+Specify the option '-m nr_thread' to use nr_thread threads for parallelizing solvers
+(only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, -s 11 and -s 21)
+
 >>> from liblinear.liblinearutil import *
 # Read data in LIBSVM format
 >>> y, x = svm_read_problem('../heart_scale')
->>> m = train(y[:200], x[:200], '-c 4')
+>>> m = train(y[:200], x[:200], '-c 4 -m 8')
 >>> p_label, p_acc, p_val = predict(y[200:], x[200:], m)
 
 # Construct problem in python format
@@ -511,6 +513,7 @@ Machine Learning Research 9(2008), 1871-1874. Software available at
 http://www.csie.ntu.edu.tw/~cjlin/liblinear
 
 For any question, please contact Chih-Jen Lin <cjlin@csie.ntu.edu.tw>,
-or check the FAQ page:
+or check the following pages:
 
 http://www.csie.ntu.edu.tw/~cjlin/liblinear/faq.html
+http://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear

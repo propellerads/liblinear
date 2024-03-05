@@ -55,9 +55,9 @@ void exit_with_help()
 	"       (for -s 0, 2, 5, 6, 11)\n"
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
-	"-m nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11)\n"
-	"-i initial model file: use a previously trained model for incremental/decremental training (only for -s 0 and 2)\n"
 	"-C : find parameters (C for -s 0, 2 and C, p for -s 11, can't exist with -i option)\n"
+	"-m nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11, 21)\n"
+	"-i initial model file: use a previously trained model for incremental/decremental training (only for -s 0 and 2)\n"
 	"-q : quiet mode (no outputs)\n"
 	"-W weight_file: set weight file (for all solvers except -s 21)\n"
 	);
@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 		fprintf(stderr,"ERROR: %s\n",error_msg);
 		exit(1);
 	}
-	if( flag_find_parameters && flag_warm_start)
+	if(flag_find_parameters && flag_warm_start)
 	{
 		fprintf(stderr,"ERROR: Option -C and -i can't both exist\n");
 		exit(1);
@@ -427,10 +427,11 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			param.solver_type != L2R_L1LOSS_SVC_DUAL &&
 			param.solver_type != L2R_L2LOSS_SVC_DUAL &&
 			param.solver_type != L1R_L2LOSS_SVC &&
-			param.solver_type != L1R_LR)
+			param.solver_type != L1R_LR &&
+			param.solver_type != ONECLASS_SVM)
 		{
-			fprintf(stderr, "Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 5, 6, 11 now\n");
-			exit_with_help();
+			printf("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11, 21 now; use single-core solvers instead.\n");
+			param.nr_thread = 1;
 		}
 	}
 

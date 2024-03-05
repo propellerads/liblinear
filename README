@@ -1,10 +1,19 @@
-LIBLINEAR is a simple package for solving large-scale regularized linear
-classification, regression and outlier detection. It currently supports
+----------------------------
+--- Multi-core LIBLINEAR ---
+----------------------------
+
+LIBLINEAR is a simple package for solving large-scale regularized
+linear classification, regression and outlier detection. This
+extension of LIBLINEAR supports multi-core parallel learning by
+OpenMP. We applied efficient implementations to train models for
+multi-core machines. Single-core LIBLINEAR currently supports
+
 - L2-regularized logistic regression/L2-loss support vector classification/L1-loss support vector classification
 - L1-regularized L2-loss support vector classification/L1-regularized logistic regression
 - L2-regularized L2-loss support vector regression/L1-loss support vector regression
 - one-class support vector machine.
-This document explains the usage of LIBLINEAR.
+
+Some have been extended or modified to use multi cores. See ``Differences from Single-core LIBLINEAR'' for details.
 
 To get started, please read the ``Quick Start'' section first.
 For developers, please check the ``Library Usage'' section to learn
@@ -13,6 +22,7 @@ how to integrate LIBLINEAR in your software.
 Table of Contents
 =================
 
+- Differences from Single-core LIBLINEAR
 - When to use LIBLINEAR but not LIBSVM
 - Quick Start
 - Installation
@@ -23,8 +33,35 @@ Table of Contents
 - Library Usage
 - Building Windows Binaries
 - MATLAB/OCTAVE interface
-- Python Interface
+- Python interface
+- References for Multi-core Implementations
 - Additional Information
+
+Differences from Single-core LIBLINEAR
+======================================
+
+The following solvers can be run in parallel.
+
+        Primal L2-regularized solvers (-s 0, -s 2)
+        ------------------------------------------
+        It does matrix-vector multiplications in parallel.
+
+        Dual L2-regularized solvers (-s 1, -s 3, -s 11)
+        -----------------------------------------------
+        It calculates the gradients in parallel, and then conducts CD
+        (coordinate descent) updates serially.
+
+        Primal l1-regularized solvers (-s 5, -s 6)
+        ------------------------------------------
+        It parallelizes feature-wise operations for the features
+        that have enough non-zeros.
+
+Details of the above solvers can be found in the references.
+
+Note: Parallelization on cross-validation or parameter search is turned off
+by default. To enable it please refer to the section
+"Parallelization on Cross-validation and Parameter Search (for ALL solvers)"
+at https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear/
 
 When to use LIBLINEAR but not LIBSVM
 ====================================
@@ -141,6 +178,8 @@ options:
 -wi weight: weights adjust the parameter C of different classes (see README for details)
 -v n: n-fold cross validation mode
 -C : find parameters (C for -s 0, 2 and C, p for -s 11, can't exist with -i option)
+-m nr_thread: use nr_thread threads for parallelizing solvers
+    (only for -s 0, -s 1, -s 2, -s 3, -s 5, -s 6, and -s 11)
 -q : quiet mode (no outputs)
 
 Option -v randomly splits the data into n parts and calculates cross
@@ -321,6 +360,14 @@ class 4         class 1,2,3.    10      10
 
 If there are only two classes, we train ONE model.
 The C values for the two classes are 10 and 50.
+
+> train -s 0 -m 8 heart_scale
+
+Run the L2-regularized logistic regression primal solver with 8 threads.
+
+> train -s 3 -m 8 heart_scale
+
+Run the L2-regularized l1-loss dual solver with 8 threads.
 
 > predict -b 1 test_file data_file.model output_file
 
@@ -678,6 +725,21 @@ Python Interface
 ================
 
 Please check the file README in the directory `python'.
+
+References for Multi-core Implementations
+=========================================
+
+M.-C. Lee, W.-L. Chiang, and C.-J. Lin.
+Fast matrix-vector multiplications for large-scale logistic regression on shared-memory systems.
+ICDM 2015
+
+W.-L. Chiang, M.-C. Lee, and C.-J. Lin.
+Parallel dual coordinate descent method for large-scale linear classification in multi-core environments.
+KDD 2016
+
+Y. Zhuang, Y.-C. Juan, G.-X. Yuan, C.-J. Lin.
+Naive parallelization of coordinate descent methods and an application on multi-core l1-regularized classification.
+CIKM 2018
 
 Additional Information
 ======================

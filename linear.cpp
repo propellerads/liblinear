@@ -238,16 +238,16 @@ double l2r_erm_fun::fun(double *w)
 	int l=prob->l;
 	int w_size=get_nr_variable();
 
-	wTw = 0;
+	// wTw, a class member, cannot be used by MS Visual C++ for openmp reduction
+	double local_wTw = 0;
 	Xv(w, wx);
 
-    double l_wTw = wTw;
-#pragma omp parallel for private(i) reduction(+:l_wTw) schedule(static)
+#pragma omp parallel for private(i) reduction(+:local_wTw) schedule(static)
 	for(i=0;i<w_size;i++)
-		l_wTw += w[i]*w[i];
-	wTw = l_wTw;
+		local_wTw += w[i]*w[i];
 	if(regularize_bias == 0)
-		wTw -= w[w_size-1]*w[w_size-1];
+		local_wTw -= w[w_size-1]*w[w_size-1];
+	wTw = local_wTw;
 #pragma omp parallel for private(i) reduction(+:f) schedule(static)
 	for(i=0;i<l;i++)
 		f += C_times_loss(i, wx[i]);
@@ -2621,12 +2621,16 @@ static int solve_oneclass_svm(const problem *prob, const parameter *param, doubl
 	{
 		negGmax = -INF;
 		negGmin = INF;
-
+#pragma omp parallel for private(s,i) schedule(static)
 		for (s=0; s<active_size; s++)
 		{
 			i = index[s];
 			feature_node * const xi = prob->x[i];
 			G[i] = sparse_operator::dot(w, xi);
+		}
+		for(s = 0; s<active_size;s++)
+		{
+			i = index[s];
 			if (alpha[i] < 1)
 				negGmax = max(negGmax, -G[i]);
 			if (alpha[i] > 0)
@@ -3298,6 +3302,32 @@ static void find_parameter_C(const problem *prob, parameter *param_tmp, double s
 }
 
 //
+// Remove zero weighed data as libsvm and some liblinear solvers require C > 0.
+//
+static void remove_zero_weight(problem *newprob, const problem *prob)
+{
+	int i;
+	int l = 0;
+	for(i=0;i<prob->l;i++)
+		if(prob->W[i] > 0) l++;
+	*newprob = *prob;
+	newprob->l = l;
+	newprob->x = Malloc(feature_node*,l);
+	newprob->y = Malloc(double,l);
+	newprob->W = Malloc(double,l);
+
+	int j = 0;
+	for(i=0;i<prob->l;i++)
+		if(prob->W[i] > 0)
+		{
+			newprob->x[j] = prob->x[i];
+			newprob->y[j] = prob->y[i];
+			newprob->W[j] = prob->W[i];
+			j++;
+		}
+}
+
+//
 // Interface functions
 //
 model* train(const problem *prob, const parameter *param)
@@ -3307,6 +3337,9 @@ model* train(const problem *prob, const parameter *param)
 
 model* warm_start_train(const problem *prob, const parameter *param, const model *wsmodel)
 {
+	problem newprob;
+	remove_zero_weight(&newprob, prob);
+	prob = &newprob;
 	int i,j;
 	int l = prob->l;
 	int n = prob->n;
@@ -3532,6 +3565,9 @@ model* warm_start_train(const problem *prob, const parameter *param, const model
 		free(sub_prob.y);
 		free(weighted_C);
 		free(sub_prob.W);
+		free(newprob.x);
+		free(newprob.y);
+		free(newprob.W);
 	}
 	return model_;
 }

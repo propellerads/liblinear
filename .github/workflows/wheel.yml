@@ -15,16 +15,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-         os: [windows-2019, macos-11]
+        os: [windows-2019, macos-11]
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Set MacOS compiler
+        if: runner.os == 'macOS'
+        run: |
+          brew install gcc@13;
+          echo "CXX=gcc-13" >> $GITHUB_ENV
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.10.2
         env:
           # don't build for PyPython and windows 32-bit
           CIBW_SKIP: pp* *win32*
+          # force compiler on macOS
+          CXX: ${{ env.CXX }}
+          CC: ${{ env.CXX }}
         with:
           package-dir: ./python
           output-dir: ./python/wheelhouse

@@ -15,7 +15,7 @@ build_ext.get_export_symbols = lambda x, y: []
 
 
 PACKAGE_DIR = "liblinear"
-PACKAGE_NAME = "liblinear-official"
+PACKAGE_NAME = "liblinear-multicore"
 VERSION = "2.47.0"
 cpp_dir = "cpp-source"
 # should be consistent with dynamic_lib_name in liblinear/liblinear.py
@@ -50,12 +50,20 @@ kwargs_for_extension = {
     "language": "c++",
 }
 
-# see ../Makefile.win
+# see ../Makefile.win and enable openmp
 if sys.platform == "win32":
     kwargs_for_extension.update(
         {
             "define_macros": [("_WIN64", ""), ("_CRT_SECURE_NO_DEPRECATE", "")],
             "extra_link_args": ["-DEF:{}\linear.def".format(cpp_dir)],
+            "extra_compile_args": ["/openmp"],
+        }
+    )
+else:
+    kwargs_for_extension.update(
+        {
+            "extra_compile_args": ["-fopenmp"],
+            "extra_link_args": ["-fopenmp"],
         }
     )
 
@@ -102,12 +110,12 @@ def main():
         name=PACKAGE_NAME,
         packages=[PACKAGE_DIR],
         version=VERSION,
-        description="Python binding of LIBLINEAR",
+        description="Python binding of multi-core LIBLINEAR",
         long_description=long_description,
         long_description_content_type="text/plain",
         author="ML group @ National Taiwan University",
         author_email="cjlin@csie.ntu.edu.tw",
-        url="https://www.csie.ntu.edu.tw/~cjlin/liblinear",
+        url="https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/multicore-liblinear",
         license=license_name,
         install_requires=["scipy"],
         ext_modules=[

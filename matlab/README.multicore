@@ -24,7 +24,7 @@ Usage
 
 The usage of train function is the same as liblinear except for the additional option:
 
--m nr_thread: use nr_thread threads for training (only for -s 0, -s 1, -s 2, -s 3 and -s 11)
+-m nr_thread: use nr_thread threads for training (only for -s 0, -s 1, -s 2, -s 3 -s 11 and -s 21)
 
 Examples
 ========

@@ -65,9 +65,9 @@ void exit_with_help()
 	"	(for -s 0, 2, 5, 6, 11)\n"
 	"-wi weight: weights adjust the parameter C of different classes (see README for details)\n"
 	"-v n: n-fold cross validation mode\n"
+    "-C : find parameters (C for -s 0, 2 and C, p for -s 11, can't exist with -i option)\n"
 	"-m nr_thread : parallel version with [nr_thread] threads (default 1; only for -s 0, 1, 2, 3, 5, 6, 11)\n"
 	"-i initial_model (matlab variable name): use a previously trained model for incremental/decremental training (only for -s 0 and 2)\n"
-	"-C : find parameters (C for -s 0, 2 and C, p for -s 11, can't exist with -i option)\n"
 	"-q : quiet mode (no outputs)\n"
 	"col:\n"
 	"	if 'col' is setted, training_instance_matrix is parsed in column format, otherwise is in row format\n"
@@ -345,10 +345,11 @@ int parse_command_line(int nrhs, const mxArray *prhs[], char *model_file_name)
 			param.solver_type != L2R_L1LOSS_SVC_DUAL &&
 			param.solver_type != L2R_L2LOSS_SVC_DUAL &&
 			param.solver_type != L1R_L2LOSS_SVC &&
-			param.solver_type != L1R_LR)
+			param.solver_type != L1R_LR &&
+			param.solver_type != ONECLASS_SVM)
 		{
-			mexPrintf("Parallel LIBLINEAR is only available for -s 0, 1, 2, 3, 5, 6, 11 now.\n");
-			return 1;
+			mexPrintf("WARNING: parallel solvers are only available for -s 0, 1, 2, 3, 5, 6, 11, 21 now; use single-core solvers instead.\n");
+			param.nr_thread = 1;
 		}
 #ifndef CV_OMP
 		mexPrintf("Total threads used: %d\n", param.nr_thread);
