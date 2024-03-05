@@ -3333,14 +3333,14 @@ static void remove_zero_weight(problem *newprob, const problem *prob)
 //
 model* train(const problem *prob, const parameter *param)
 {
-	problem newprob;
-	remove_zero_weight(&newprob, prob);
-	prob = &newprob;
 	return warm_start_train(prob, param, NULL);
 }
 
 model* warm_start_train(const problem *prob, const parameter *param, const model *wsmodel)
 {
+	problem newprob;
+	remove_zero_weight(&newprob, prob);
+	prob = &newprob;
 	int i,j;
 	int l = prob->l;
 	int n = prob->n;
