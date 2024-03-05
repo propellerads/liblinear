@@ -183,7 +183,7 @@ class problem(Structure):
             if len(W) != 0 and len(W) != x.shape[0]:
                 raise ValueError("len(W) != len(x)")
             if isinstance(x, np.ndarray):
-                x = scipy.ascontiguousarray(x) # enforce row-major
+                x = np.ascontiguousarray(x) # enforce row-major
             if isinstance(x, sparse.spmatrix):
                 x = x.tocsr()
                 pass
@@ -207,8 +207,8 @@ class problem(Structure):
         self.n = max_idx
 
         self.W = (c_double * l)()
-        if scipy != None and isinstance(W, scipy.ndarray):
-            scipy.ctypeslib.as_array(self.W, (self.l,))[:] = W
+        if scipy != None and isinstance(W, np.ndarray):
+            np.ctypeslib.as_array(self.W, (self.l,))[:] = W
         else:
             for i, Wi in enumerate(W): self.W[i] = Wi
 
