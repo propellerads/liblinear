@@ -16,7 +16,7 @@ build_ext.get_export_symbols = lambda x, y: []
 
 PACKAGE_DIR = "liblinear"
 PACKAGE_NAME = "liblinear-official"
-VERSION = "2.43.0"
+VERSION = "2.47.0"
 cpp_dir = "cpp-source"
 # should be consistent with dynamic_lib_name in liblinear/liblinear.py
 dynamic_lib_name = "clib"
@@ -37,6 +37,11 @@ headers = [
     "linear.h",
     "linear.def",
 ]
+
+# license parameters
+license_source = path.join("..", "COPYRIGHT")
+license_file = "LICENSE"
+license_name = "BSD-3-Clause"
 
 kwargs_for_extension = {
     "sources": [path.join(cpp_dir, f) for f in source_codes],
@@ -67,7 +72,7 @@ def create_cpp_source():
 class CleanCommand(clean_cmd):
     def run(self):
         clean_cmd.run(self)
-        to_be_removed = ["build/", "dist/", "MANIFEST", cpp_dir, "{}.egg-info".format(PACKAGE_NAME)]
+        to_be_removed = ["build/", "dist/", "MANIFEST", cpp_dir, "{}.egg-info".format(PACKAGE_NAME), license_file]
         to_be_removed += glob("./{}/{}.*".format(PACKAGE_DIR, dynamic_lib_name))
         for root, dirs, files in os.walk(os.curdir, topdown=False):
             if "__pycache__" in dirs:
@@ -87,6 +92,9 @@ def main():
     if not path.exists(cpp_dir):
         create_cpp_source()
 
+    if not path.exists(license_file):
+        copyfile(license_source, license_file)
+
     with open("README") as f:
         long_description = f.read()
 
@@ -100,6 +108,7 @@ def main():
         author="ML group @ National Taiwan University",
         author_email="cjlin@csie.ntu.edu.tw",
         url="https://www.csie.ntu.edu.tw/~cjlin/liblinear",
+        license=license_name,
         install_requires=["scipy"],
         ext_modules=[
             Extension(
